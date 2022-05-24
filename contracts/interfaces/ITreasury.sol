@@ -11,8 +11,6 @@ interface ITreasury {
             uint256,
             uint256,
             uint256,
-            uint256,
-            uint256,
             uint256
         );
 }

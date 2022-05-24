@@ -28,9 +28,9 @@ contract Treasury is ITreasury, Operator, ReentrancyGuard {
 
     // fees
     uint256 public slippage_tolerance_fee;
-    unit public lp_token_holders_fee;
-    unit public treaury_fee;
-    unit public upfi_buyback_burn_fee;
+    uint256 public lp_token_holders_fee;
+    uint256 public treaury_fee;
+    uint256 public upfi_buyback_burn_fee;
 
     bool public collateral_ratio_paused = true; // during bootstraping phase, collateral_ratio will be fixed at 100%
 
@@ -52,18 +52,19 @@ contract Treasury is ITreasury, Operator, ReentrancyGuard {
     function info()
         external
         view
+        override
         returns (
             uint256,
             uint256,
             uint256,
-            uint256,
+            uint256
         )
     {
         return (
             slippage_tolerance_fee, 
             lp_token_holders_fee,
             treaury_fee, 
-            upfi_buyback_burn_fee,
+            upfi_buyback_burn_fee
         );
     }
 
