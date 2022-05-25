@@ -111,11 +111,9 @@ contract Exchange is Operator, ReentrancyGuard, IExchange {
     function swapTokenToToken(
         uint256 _collateral_amount,
         uint256 _collateral_out_min,
-        string memory from_symbol,
-        string memory to_symbol,
-        uint256 _deadline
-    ) external ensure(_deadline) returns (uint256[] memory amounts) {
-        require(swap_paused == false, "Minting is paused");
+        string[] memory symbol
+    ) external ensure(deadline) returns (uint256[] memory amounts) {
+        require(swap_paused == false, "Swapping is paused");
         (
             uint256 slippage_tolerance_fee,
             uint256 lp_token_holders_fee,
@@ -124,45 +122,54 @@ contract Exchange is Operator, ReentrancyGuard, IExchange {
         ) = ITreasury(treasury).info();
 
         require(
-            ERC20(token_shares[from_symbol]).balanceOf(address(this)).add(
+            ERC20(token_shares[symbol[0]]).balanceOf(address(this)).add(
                 _collateral_amount
             ) <= pool_ceiling,
             ">poolCeiling"
         );
 
+        // caculator value when swap
         uint256 _total_collateral_value = 0;
-        uint256 tfrom_tto_ratio = (token_share_prices[from_symbol] *
-            PRICE_PRECISION) /
-            (token_share_prices[to_symbol] * PRICE_PRECISION);
+        {
+            uint256 tfrom_tto_ratio = (token_share_prices[symbol[0]] *
+                PRICE_PRECISION) /
+                (token_share_prices[symbol[1]] * PRICE_PRECISION);
 
-        if (tfrom_tto_ratio > 0) {
-            uint256 _collateral_value = _collateral_amount
-                .mul(getCollateralPrice())
-                .div(PRICE_PRECISION);
+            if (tfrom_tto_ratio > 0) {
+                uint256 _collateral_value = _collateral_amount
+                    .mul(getCollateralPrice())
+                    .div(PRICE_PRECISION);
 
-            //lay ra tổng số đồng token to
-            _total_collateral_value = _collateral_value * tfrom_tto_ratio;
+                //lay ra tổng số đồng token to
+                _total_collateral_value = _collateral_value * tfrom_tto_ratio;
+            }
         }
 
-        uint256 _actual_collateral_amount = _total_collateral_value.sub(
-            (_total_collateral_value.mul(slippage_tolerance_fee)).div(
-                PRICE_PRECISION
-            )
-        );
-
-        uint256 _final_collateral_amount = _actual_collateral_amount.sub(
-            (
-                _actual_collateral_amount.mul(
-                    lp_token_holders_fee + treaury_fee + upfi_buyback_burn_fee
+        // caculator fee
+        uint256 _final_collateral_amount = 0;
+        {
+            uint256 _actual_collateral_amount = _total_collateral_value.sub(
+                (_total_collateral_value.mul(slippage_tolerance_fee)).div(
+                    PRICE_PRECISION
                 )
-            ).div(PRICE_PRECISION)
-        );
+            );
 
-        require(_collateral_out_min <= _actual_collateral_amount, ">slippage");
+            _final_collateral_amount = _actual_collateral_amount.sub(
+                (
+                    _actual_collateral_amount.mul(
+                        lp_token_holders_fee +
+                            treaury_fee +
+                            upfi_buyback_burn_fee
+                    )
+                ).div(PRICE_PRECISION)
+            );
+        }
+
+        require(_collateral_out_min <= _final_collateral_amount, ">slippage");
 
         // if (_collateral_amount > 0) {
         //     // Todo: transfer _collateral_amount from sender to contract
-        //     ERC20(token_shares[from_symbol]).transferFrom(
+        //     ERC20(token_shares[symbol[0]]).transferFrom(
         //         msg.sender,
         //         address(this),
         //         _collateral_amount
@@ -171,17 +178,17 @@ contract Exchange is Operator, ReentrancyGuard, IExchange {
 
         // if (_final_collateral_amount > 0) {
         //     // Todo: transfer _final_collateral_amount from contract to sender
-        //     ERC20(token_shares[from_symbol]).transfer(
+        //     ERC20(token_shares[symbol[0]]).transfer(
         //         msg.sender,
         //         _final_collateral_amount
         //     );
         // }
 
         address[] memory path;
-        path[0] = token_shares[from_symbol];
-        path[1] = token_shares[to_symbol];
+        path[0] = token_shares[symbol[0]];
+        path[1] = token_shares[symbol[1]];
         // Todo: swap token to token
-        IPancakeRouter01(router).swapTokensForExactTokens(
+        amounts = IPancakeRouter01(router).swapTokensForExactTokens(
             _collateral_amount,
             _final_collateral_amount,
             path,
